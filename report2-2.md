@@ -5,6 +5,7 @@
 
 ##解答
 * start
+
 コントローラが起動したタイミングでstartハンドラが呼ばれる。複数スイッチを管理するために、FDBを連想配列として扱っている。、
 
 ```
@@ -14,7 +15,10 @@
   end
 ```
 
+
+
 * switch_ready
+
 コントローラがスイッチに接続したときにswitch_readyハンドラが呼び出される。先ほど生成した連想配列@fdbsにスイッチのデータパスIDを用いて新たなFDBを格納している。
 ```
   def switch_ready(datapath_id)
@@ -22,8 +26,12 @@
   end
 
 ```
-                                                  
+          
+
+
+                                        
 * packet_in
+
 PacketInが発生するとpacket_inハンドラが呼び出される。このとき更新するFDBを特定するためにfetchを用いてデータパスIDのFDBから目的となるFDBを特定し、学習するようにしている。その後、flow_mod_and_packet_out messageによりFlowModやPacketOutを行っている。
 ```
   def packet_in(datapath_id, message)
@@ -32,6 +40,8 @@ PacketInが発生するとpacket_inハンドラが呼び出される。このと
     flow_mod_and_packet_out message
   end
 ```
+
+
 * flow_mod_and_packet_out
 
 @fdbs.fetch(message.dpid).lookup(message.destination_mac)によりFDBに登録されているMACアドレスを参照し、送信先のMACアドレスが登録されているかされていないかでその後分岐する。登録されているときはフローテーブルにフローエントリーを追加して、送信先のMACアドレスが接続しているポート番号に向けてPacketOutする。登録されていない場合にはfloodオプションをつけフラッディングするようにする。
@@ -57,8 +67,5 @@ PacketInが発生するとpacket_inハンドラが呼び出される。このと
       actions: SendOutPort.new(port_no)
     )
   end
-
-
-
 ```
 

@@ -69,3 +69,106 @@ PacketInが発生するとpacket_inハンドラが呼び出される。このと
   end
 ```
 
+##動作確認
+以下のような環境で動作確認を行った
+
+```
+vswitch('lsw1') { datapath_id 0x1 }
+vswitch('lsw2') { datapath_id 0x2 }
+
+
+vhost('host1')
+vhost('host2')
+vhost('host3')
+vhost('host4')
+
+link 'lsw1', 'host1'
+link 'lsw1', 'host2'
+link 'lsw2', 'host3'
+link 'lsw2', 'host4'
+```
+
+![](network.png)
+
+
+
+
+まず、ホスト1からホスト2に送信を行った。
+
+
+```
+$　./bin/trema send_packets --source host1 --dest host2
+$　./bin/trema show_stats host1
+Packets sent:
+  192.168.0.1 -> 192.168.0.2 = 1 packet
+$　./bin/trema show_stats host2
+Packets received:
+  192.168.0.1 -> 192.168.0.2 = 1 packet
+$ ./bin/trema dump_flows lsw1
+```
+
+以上の結果より、host1(192.168.0.1)からhost2(192.168.0.2)にパケットが送信されている。
+
+
+
+
+今度は逆にhost2からhost1に送信を行った。
+
+
+```
+$ ./bin/trema send_packets --source host2 --dest host1
+$ ./bin/trema show_stats host1
+Packets sent:
+  192.168.0.1 -> 192.168.0.2 = 1 packet
+Packets received:
+  192.168.0.2 -> 192.168.0.1 = 1 packet
+$ ./bin/trema show_stats host2
+Packets sent:
+  192.168.0.2 -> 192.168.0.1 = 1 packet
+Packets received:
+  192.168.0.1 -> 192.168.0.2 = 1 packet
+
+```
+さらに、host2からhost1へのパケットも送信も行われていることを確認。
+
+もう一度host1からhost2に送信を行った。
+
+
+```
+$ ./bin/trema send_packets --source host1 --dest host2
+$ ./bin/trema show_stats host1
+Packets sent:
+  192.168.0.1 -> 192.168.0.2 = 2 packets
+Packets received:
+  192.168.0.2 -> 192.168.0.1 = 1 packet
+$ ./bin/trema show_stats host1
+Packets sent:
+  192.168.0.2 -> 192.168.0.1 = 1 packet
+Packets received:
+  192.168.0.1 -> 192.168.0.2 = 2 packets
+```
+
+となり正しくパケットの伝送が行えている。双方向にパケットを送信することで、フローエントリが更新される。
+
+
+最後に、host3(192.168.0.3)とhost4(192.168.0.4)で同じことをしてから、
+host1からhost3にパケット伝送を行った。
+
+```
+$ ./bin/trema send_packets --source host1 --dest host3
+$ ./bin/trema show_stats host1
+Packets sent:
+  192.168.0.1 -> 192.168.0.2 = 2 packets
+  192.168.0.1 -> 192.168.0.3 = 1 packet
+Packets received:
+  192.168.0.2 -> 192.168.0.1 = 1 packet
+$ ./bin/trema show_stats host3
+Packets sent:
+  192.168.0.3 -> 192.168.0.4 = 2 packets
+Packets received:
+  192.168.0.4 -> 192.168.0.3 = 1 packet
+```
+
+という結果になった、これはhost1はパケットをhost3に送信したのに対し、host3にはその記録がない。このことから、
+パケットが到達しなかったことがわかる。host1はlsw1にパケットを送信した後、lswはコントローラに問い合わせを行う。その後、フラッティングを行い伝送を試みるが、lsw1とlsw2が繋がっていないためパケットは棄却され、host3にパケットが到達しなかった。
+
